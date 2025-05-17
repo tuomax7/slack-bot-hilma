@@ -3,25 +3,22 @@ from datetime import datetime, timezone
 import os
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from dotenv import load_dotenv
 import ssl
 import certifi
 
+# Load dotenv only if run locally
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 
-# Load API keys and config from environment variables (no dotenv here)
-API_KEY = os.getenv("HANKINTA_API_KEY")
+# Load API keys and config
+API_KEY = os.getenv("PRIMARY_API_KEY")
 SLACK_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 CHANNEL_ID = os.getenv("SLACK_CHANNEL_ID")
 
 client = WebClient(token=SLACK_TOKEN)
-
-SEARCH_TERMS = [
-    "sovellus", "web-sovellus", "mobiilisovellus", "digipalvelu",
-    "ohjelmisto", "software", "application", "web application",
-    "mobile app", "digital service"
-]
-
 API_URL = "https://api.hankintailmoitukset.fi/avp/eformnotices/docs/search"
 
 HEADERS = {
@@ -30,15 +27,27 @@ HEADERS = {
     "Ocp-Apim-Subscription-Key": API_KEY
 }
 
+COUNT = 5
+
+SEARCH_TERMS = [
+    "sovellus", "web-sovellus", "mobiilisovellus", "digipalvelu",
+    "ohjelmisto", "software", "application", "web application",
+    "mobile app", "digital service"
+]
+
+LIMIT = 1000
+ORDER_BY = "datePublished desc"
+PROCUREMENT_TYPE_CODE = "services"
+
 
 def fetch_procurements():
     search_query = " OR ".join(SEARCH_TERMS)
     body = {
         "search": search_query,
-        "top": "1000",
+        "top": LIMIT,
         "count": "true",
         "searchMode": "any",
-        "orderby": "datePublished desc"
+        "orderby": ORDER_BY
     }
 
     try:
@@ -57,7 +66,7 @@ def filter_fields(data):
     for item in data.get("value", []):
         if (
             item.get("mainType") == "ContractAwardNotices"
-            or item.get("procurementTypeCode") != "services"
+            or item.get("procurementTypeCode") != PROCUREMENT_TYPE_CODE
         ):
             skipped += 1
             continue
@@ -77,7 +86,7 @@ def filter_fields(data):
                 "deadline": item.get("deadline"),
                 "procedureId": procedure_id,
                 "noticeId": notice_id,
-                "estimatedValue": item.get("estimatedValue")  # new field
+                "estimatedValue": item.get("estimatedValue")
             })
         else:
             skipped += 1
@@ -93,7 +102,7 @@ def format_date_fi(date_str):
         dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
         return dt.strftime("%d.%m.%Y")
     except Exception:
-        return date_str[:10]  # fallback
+        return date_str[:10]
 
 
 def format_message(offers):
@@ -101,7 +110,7 @@ def format_message(offers):
         return "_Ei löydetty uusia tarjouksia._"
 
     message_lines = []
-    for i, offer in enumerate(offers[:5], start=1):
+    for i, offer in enumerate(offers[:COUNT], start=1):
         link = f"https://www.hankintailmoitukset.fi/fi/public/procedure/{offer['procedureId']}/enotice/{offer['noticeId']}/"
         est_val_str = f"*Arvioitu arvo:* {offer['estimatedValue']:,.2f} €\n" if offer.get("estimatedValue") else ""
         
@@ -115,9 +124,8 @@ def format_message(offers):
         desc_preview = offer['descriptionFi'][:300] + ("..." if len(offer['descriptionFi']) > 300 else "")
         message_lines.append(desc_preview)
 
-        # Add divider after each offer except the last one
-        if i < len(offers[:5]):
-            message_lines.append("──────────")  # Unicode heavy line as divider
+        if i < len(offers[:COUNT]):
+            message_lines.append("──────────")
 
     return "\n\n".join(message_lines)
 
@@ -141,7 +149,7 @@ def job():
         filtered_data = filter_fields(data)
 
         if len(filtered_data) >= 3:
-            message = format_message(filtered_data[:5])
+            message = format_message(filtered_data[:COUNT])
         elif filtered_data:
             message = format_message(filtered_data)
         else:
@@ -150,6 +158,9 @@ def job():
     send_to_slack(message)
 
 
-# Cloud Function entry point
 def run_daily_procurements(event, context):
+    job()
+
+
+if __name__ == "__main__":
     job()
