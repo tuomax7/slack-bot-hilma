@@ -2,7 +2,8 @@
 
 This Slack bot function fetches procurement and project notices related to digital services from the [Hilma AVP API](https://hns-hilma-prod-apim.developer.azure-api.net/) (Finnish procurement system for the public sector) and posts a concise summary of posted relevant procurement notices to a Slack channel.
 
-<img width="696" alt="image" src="https://github.com/user-attachments/assets/f9c3e70e-4a58-41c1-b0e4-6b1e2a085931" />
+<img width="707" alt="image" src="https://github.com/user-attachments/assets/ae3190bc-2c3c-48f8-9dd7-20584ab2e46a" />
+
 
 ## Configuration and search options
 
