@@ -8,9 +8,8 @@ This Slack bot function fetches procurement and project notices related to digit
 
 `main.py` defines all of the procurement API search logic. The following search configuration values can be set to define what type of procurement notices are searched for.
 
+- `MESSAGE_NOTICE_LIMIT`: maximum number of procurement notices sent to user per message
 - `SEARCH_TERMS`: an array that includes all search strings, such as: 'software', 'application', etc.
-- `COUNT`: maximum number of procurement notices sent to user
-- `PROCUREMENT_TYPE_CODE`: what type of procurement notices are looked for, e.g. 'services'
 
 ---
 

@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 
-# Load API keys and config
+# Load API keys and configs
 API_KEY = os.getenv("PRIMARY_API_KEY")
 SLACK_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 CHANNEL_ID = os.getenv("SLACK_CHANNEL_ID")
@@ -34,7 +34,6 @@ yesterday = today - timedelta(days=1)
 
 MESSAGE_NOTICE_LIMIT = 5
 
-
 SEARCH_TERMS = [
     "sovelluskehitys", "ohjelmistokehitys", "web-sovellus", "mobiilisovellus",
     "digipalvelu", "verkkopalvelu", "järjestelmäkehitys", "palvelumuotoilu",
@@ -44,7 +43,7 @@ SEARCH_TERMS = [
     "AI", "machine learning", "TensorFlow", "React", "React Native",
 ]
 
-ORDER_BY = "datePublished desc"
+# TODO: add configs for CPV codes, region filters, notice mainTypes and description text cutoff length
 
 def fetch_procurements():
     
@@ -63,7 +62,6 @@ def fetch_procurements():
         "filter": notice_type_filter + " and " + date_filter,
         "count": "true",
         "searchMode": "any",
-        "orderby": ORDER_BY
     }
 
     try:
