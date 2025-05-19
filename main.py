@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -27,24 +27,40 @@ HEADERS = {
     "Ocp-Apim-Subscription-Key": API_KEY
 }
 
-COUNT = 5
+today = datetime.now(timezone.utc).date()
+yesterday = today - timedelta(days=1)
+
+# User configurable configs
+
+MESSAGE_NOTICE_LIMIT = 5
+
 
 SEARCH_TERMS = [
-    "sovellus", "web-sovellus", "mobiilisovellus", "digipalvelu",
-    "ohjelmisto", "software", "application", "web application",
-    "mobile app", "digital service"
+    "sovelluskehitys", "ohjelmistokehitys", "web-sovellus", "mobiilisovellus",
+    "digipalvelu", "verkkopalvelu", "järjestelmäkehitys", "palvelumuotoilu",
+    "käytettävyystutkimus", "UX", "UI", "käyttöliittymäsuunnittelu", 
+    "käyttäjäkokemussuunnittelu", "design sprint", "strateginen muotoilu", "pilvipalvelu", "pilviarkkitehtuuri", "DevOps",
+    "Google Cloud", "AWS", "Azure", "tekoäly", "koneoppiminen", 
+    "AI", "machine learning", "TensorFlow", "React", "React Native",
 ]
 
-LIMIT = 1000
 ORDER_BY = "datePublished desc"
-PROCUREMENT_TYPE_CODE = "services"
-
 
 def fetch_procurements():
-    search_query = " OR ".join(SEARCH_TERMS)
+    
+    search_query =  "(" + " OR ".join(SEARCH_TERMS) + ")" + "cpvCodes:(48* OR 72*)"
+
+    date_from = f"{yesterday.isoformat()}T00:00:00.000Z"
+    date_to = f"{yesterday.isoformat()}T23:59:00.000Z"
+    expiration_date = f"{today.isoformat()}T23:59:00.000Z"
+
+    date_filter = f'datePublished ge {date_from} and datePublished lt {date_to} and expirationDate ge {expiration_date}'
+    
+    notice_type_filter = "search.in(mainType, 'ContractNotices|NationalNotices|PriorInformationNotices', '|')"
+
     body = {
         "search": search_query,
-        "top": LIMIT,
+        "filter": notice_type_filter + " and " + date_filter,
         "count": "true",
         "searchMode": "any",
         "orderby": ORDER_BY
@@ -60,39 +76,25 @@ def fetch_procurements():
 
 
 def filter_fields(data):
-    filtered = []
-    skipped = 0
+    valid_notices = []
 
     for item in data.get("value", []):
-        if (
-            item.get("mainType") == "ContractAwardNotices"
-            or item.get("procurementTypeCode") != PROCUREMENT_TYPE_CODE
-        ):
-            skipped += 1
-            continue
 
-        title = item.get("titleFi")
-        org = item.get("organisationNameFi")
-        desc = item.get("descriptionFi")
-        procedure_id = item.get("procedureId")
-        notice_id = item.get("noticeId")
+        valid_notices.append({
+        	"datePublished": item.get("datePublished"),
+        	"title": item.get("titleFi") or item.get("titleEn") or item.get("titleSv"),
+        	"organisationName": item.get("organisationNameFi") or item.get("organisationNameEn") or item.get("organisationNameSv"),
+        	"description": item.get("descriptionFi") or item.get("descriptionEn") or item.get("descriptionSv"),
+        	"deadline": item.get("deadline"),
+        	"procedureId": item.get("procedureId"),
+        	"noticeId": item.get("noticeId"),
+        	"estimatedValue": item.get("estimatedValue"),
+        	"searchScore": item.get("@search.score")
+        })
 
-        if title and org and desc and procedure_id and notice_id:
-            filtered.append({
-                "datePublished": item.get("datePublished"),
-                "titleFi": title,
-                "organisationNameFi": org,
-                "descriptionFi": desc,
-                "deadline": item.get("deadline"),
-                "procedureId": procedure_id,
-                "noticeId": notice_id,
-                "estimatedValue": item.get("estimatedValue")
-            })
-        else:
-            skipped += 1
 
-    print(f"Filtered {len(filtered)} valid service offers, skipped {skipped}.")
-    return filtered
+    print(f"LOG: Found {len(valid_notices)} valid procurement notices.")
+    return valid_notices
 
 
 def format_date_fi(date_str):
@@ -106,37 +108,37 @@ def format_date_fi(date_str):
 
 
 def format_message(offers):
-    if not offers:
-        return "_Ei löydetty uusia tarjouksia._"
 
     message_lines = []
-    for i, offer in enumerate(offers[:COUNT], start=1):
+    for i, offer in enumerate(offers[:MESSAGE_NOTICE_LIMIT], start=1):
         link = f"https://www.hankintailmoitukset.fi/fi/public/procedure/{offer['procedureId']}/enotice/{offer['noticeId']}/"
-        est_val_str = f"*Arvioitu arvo:* {offer['estimatedValue']:,.2f} €\n" if offer.get("estimatedValue") else ""
+        
+        est_val_str = f"*Arvo:* {offer['estimatedValue']:,.2f} €\n" if offer.get("estimatedValue") else ""
         
         message_lines.append(
-            f"*{i}. <{link}|{offer['titleFi']}>*\n"
-            f"> *Organisaatio:* {offer['organisationNameFi']}\n"
+            f"*{i}. <{link}|{offer['title']}>*\n"
+            f"> *Sopivuuspisteet:* {round(offer['searchScore'])}\n"
+            f"> *Organisaatio:* {offer['organisationName']}\n"
             f"> *Julkaistu:* {format_date_fi(offer['datePublished'])}\n"
             f"> *Deadline:* {format_date_fi(offer['deadline'])}\n"
             f"> {est_val_str}"
         )
-        desc_preview = offer['descriptionFi'][:300] + ("..." if len(offer['descriptionFi']) > 300 else "")
-        message_lines.append(desc_preview)
+        
+        desc_preview = offer['description'][:300] + ("..." if len(offer['description']) > 300 else "")
+        message_lines.append(desc_preview + "\n\n")
 
-        if i < len(offers[:COUNT]):
-            message_lines.append("──────────")
+    message_lines.append("──────────────────\n\n")
 
-    return "\n\n".join(message_lines)
+    return "\n".join(message_lines)
 
 
 def send_to_slack(message):
     try:
         response = client.chat_postMessage(
             channel=CHANNEL_ID,
-            text=f":mag: *Eilisen tarjouskatsaus ({datetime.now(timezone.utc).strftime('%d.%m.%Y')})*\n\n{message}"
+            text=f":mag: *Eilisen hankintailmoituskatsaus ({yesterday.strftime('%d.%m.%Y')})*\n\n{message}"
         )
-        print(f"Message sent: {response['ts']}")
+        print("LOG: Message sent succesfully!")
     except SlackApiError as e:
         print(f"Slack API error: {e.response['error']}")
 
@@ -144,16 +146,15 @@ def send_to_slack(message):
 def job():
     data = fetch_procurements()
     if data is None:
-        message = "Hilma-tarjousten hakeminen epäonnistui."
+        message = "Hilma-hankintailmoitusten hakeminen epäonnistui."
     else:
         filtered_data = filter_fields(data)
+        sorted_data = sorted(filtered_data, key=lambda x: x["searchScore"], reverse=True)
 
-        if len(filtered_data) >= 3:
-            message = format_message(filtered_data[:COUNT])
-        elif filtered_data:
-            message = format_message(filtered_data)
+        if len(filtered_data) >= 1:
+            message = format_message(sorted_data[:MESSAGE_NOTICE_LIMIT])
         else:
-            message = "_Alle 3 kelvollista palvelutarjousilmoitusta tänään._"
+            message = "_0 eilen julkaistua hankintailmoitusta löydetty._"
 
     send_to_slack(message)
 

@@ -4,7 +4,6 @@ This Slack bot function fetches procurement and project notices related to digit
 
 <img width="696" alt="image" src="https://github.com/user-attachments/assets/f9c3e70e-4a58-41c1-b0e4-6b1e2a085931" />
 
-
 ## Configuration and search options
 
 `main.py` defines all of the procurement API search logic. The following search configuration values can be set to define what type of procurement notices are searched for.
@@ -87,11 +86,11 @@ gcloud pubsub topics create procurements-topic
 
 ### 3. Create a Cloud Scheduler job
 
-Set the `--schedule` option to the specify how often should the bot run and send a Slack message. Use [unix-cron-formatting](https://www.ibm.com/docs/en/db2/11.5.x?topic=task-unix-cron-format). The example below runs at 06:00 UTC time every day Mon - Sun.
+Set the `--schedule` option to the specify how often should the bot run and send a Slack message. Use [unix-cron-formatting](https://www.ibm.com/docs/en/db2/11.5.x?topic=task-unix-cron-format). The example below runs at 06:00 UTC time every day Mon - Fri.
 
 ```bash
 gcloud scheduler jobs create pubsub procurements-job \
-  --schedule="0 6 * * *" \
+  --schedule="0 6 * * 1-5" \
   --topic=procurements-topic \
   --message-body="run" \
   --location="us-central1"
