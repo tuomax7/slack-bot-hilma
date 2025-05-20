@@ -85,6 +85,7 @@ def filter_fields(data):
         	"description": item.get("descriptionFi") or item.get("descriptionEn") or item.get("descriptionSv"),
         	"deadline": item.get("deadline"),
         	"procedureId": item.get("procedureId"),
+            "oldProcurementProjectId": item.get("oldProcurementProjectId"),
         	"noticeId": item.get("noticeId"),
         	"estimatedValue": item.get("estimatedValue"),
         	"searchScore": item.get("@search.score")
@@ -109,9 +110,15 @@ def format_message(offers):
 
     message_lines = []
     for i, offer in enumerate(offers[:MESSAGE_NOTICE_LIMIT], start=1):
-        link = f"https://www.hankintailmoitukset.fi/fi/public/procedure/{offer['procedureId']}/enotice/{offer['noticeId']}/"
-        
+		
         est_val_str = f"*Arvo:* {offer['estimatedValue']:,.2f} €\n" if offer.get("estimatedValue") else ""
+        
+        if(offer['oldProcurementProjectId'] and getattr(offer, 'procedureId', '0') == '0'  ):
+          link = f"https://www.hankintailmoitukset.fi/fi/public/procurement/{offer['oldProcurementProjectId']}/notice/{offer['noticeId']}/"
+        elif (offer['procedureId']):
+          link = f"https://www.hankintailmoitukset.fi/fi/public/procedure/{offer['procedureId']}/enotice/{offer['noticeId']}/"
+        else:
+          link = None
         
         message_lines.append(
             f"*{i}. <{link}|{offer['title']}>*\n"
