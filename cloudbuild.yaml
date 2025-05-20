@@ -1,0 +1,25 @@
+steps:
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: "bash"
+    secretEnv:
+      - PRIMARY_API_KEY
+      - SLACK_BOT_TOKEN
+      - SLACK_CHANNEL_ID
+    args:
+      - "-c"
+      - |
+        gcloud functions deploy daily_slack_procurements \
+          --runtime python312 \
+          --trigger-topic procurements-topic \
+          --entry-point run_daily_procurements \
+          --timeout 540 \
+          --gen2 \
+          --region=us-central1 \
+          --set-env-vars="PRIMARY_API_KEY=$PRIMARY_API_KEY,SLACK_BOT_TOKEN=$SLACK_BOT_TOKEN,SLACK_CHANNEL_ID=$SLACK_CHANNEL_ID"
+
+secrets:
+  - kmsKeyName: projects/sandbox-436207/locations/global/keyRings/cloudbuild/cryptoKeys/cloudbuild-key
+    secretEnv:
+      PRIMARY_API_KEY: projects/sandbox-436207/secrets/PRIMARY_API_KEY/versions/latest
+      SLACK_BOT_TOKEN: projects/sandbox-436207/secrets/SLACK_BOT_TOKEN/versions/latest
+      SLACK_CHANNEL_ID: projects/sandbox-436207/secrets/SLACK_CHANNEL_ID/versions/latest

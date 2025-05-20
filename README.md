@@ -4,7 +4,6 @@ This Slack bot function fetches procurement and project notices related to digit
 
 <img width="707" alt="image" src="https://github.com/user-attachments/assets/ae3190bc-2c3c-48f8-9dd7-20584ab2e46a" />
 
-
 ## Configuration and search options
 
 `main.py` defines all of the procurement API search logic. The following search configuration values can be set to define what type of procurement notices are searched for.
@@ -64,18 +63,19 @@ python main.py
 
 This bot is designed to be deployed as a scheduled cloud function (e.g., Google Cloud Functions or AWS Lambda).
 
-Here is an example of how to deploy to a Google Cloud Run Function using the `gcloud` CLI.
+Here is an example of how to deploy to a 2nd gen Google Cloud Run Function using the `gcloud` CLI.
 
 ### 1. Deploy the cloud function
 
 ```bash
-gcloud functions deploy run_daily_procurements \
+gcloud functions deploy daily_slack_procurements \
 --runtime python312 \
 --trigger-topic procurements-topic \
 --entry-point run_daily_procurements \
 --timeout 540 \
---set-env-vars
-PRIMARY_API_KEY="XXX",SLACK_BOT_TOKEN="YYY",SLACK_CHANNEL_ID="ZZZ"
+--gen2 \
+--region=”us-central1” \
+--set-env-vars PRIMARY_API_KEY="XXX",SLACK_BOT_TOKEN="YYY",SLACK_CHANNEL_ID="ZZZ"
 ```
 
 ### 2. Create a Cloud PubSub-topic
